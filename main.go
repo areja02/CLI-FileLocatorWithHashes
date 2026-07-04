@@ -2,15 +2,18 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/md5"
 	"crypto/sha256"
 	"errors"
 	"io"
 	"io/fs"
 	"log"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"fmt"
 	"os"
@@ -71,37 +74,49 @@ func IsAdmin() bool {
 }
 
 func main() {
+	closeSignals, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 	//Variable Initialization and Setting Variable State
-	var hash256STR []byte
-	var hashMD5STR []byte
-	fmt.Println("Which File Are You Searching For?")
-	fileInQuestion := UserInput()
-	homeDirectory, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("Error Processing Home Directory %v\n", err)
-	}
-	if IsAdmin() {
-		//Runs the check if the user is admin
-		fmt.Println("Please Set Root Directory.")
-		homeDirectory = UserInput()
-	}
-	files, e := OpenFile(homeDirectory, fileInQuestion)
-	if e != nil {
-		log.Print("Error Reading Files or Directories\nPlease Ensure Item was Not Mispelled.\n")
-	}
-	for _, file := range files {
-		//Loop that'll print out each file found and their respective hashes
-		hasher256 := sha256.New()
-		hasherMD5 := md5.New()
-		defer file.Close()
+	select {
+	case <-closeSignals.Done():
+		return
+	default:
+		for {
+			fmt.Println("Please Press CTRL+C To Exit")
+			var hash256STR []byte
+			var hashMD5STR []byte
+			fmt.Println("Which File Are You Searching For?")
+			fileInQuestion := UserInput()
+			homeDirectory, err := os.UserHomeDir()
+			if err != nil {
+				log.Fatalf("Error Processing Home Directory %v\n", err)
+			}
+			if IsAdmin() {
+				//Runs the check if the user is admin
+				fmt.Println("Please Set Root Directory.")
+				homeDirectory = UserInput()
+			}
+			files, e := OpenFile(homeDirectory, fileInQuestion)
+			if e != nil {
+				log.Print("Error Reading Files or Directories\nPlease Ensure Item was Not Mispelled.\n")
+			}
+			for _, file := range files {
+				//Loop that'll print out each file found and their respective hashes
+				hasher256 := sha256.New()
+				hasherMD5 := md5.New()
+				defer file.Close()
 
-		if _, err := io.Copy(hasher256, file); err != nil {
-		}
-		hash256STR = hasher256.Sum(nil)
+				if _, err := io.Copy(hasher256, file); err != nil {
+				}
+				hash256STR = hasher256.Sum(nil)
 
-		if _, err := io.Copy(hasherMD5, file); err != nil {
+				if _, err := io.Copy(hasherMD5, file); err != nil {
+				}
+				hashMD5STR = hasherMD5.Sum(nil)
+				fmt.Printf("File Path: %s\n   SHA256 HASH: %x\n   MD5 Hash: %x\n", file.Name(), hash256STR, hashMD5STR)
+			}
 		}
-		hashMD5STR = hasherMD5.Sum(nil)
-		fmt.Printf("File Path: %s\n   SHA256 HASH: %x\n   MD5 Hash: %x\n", file.Name(), hash256STR, hashMD5STR)
+
 	}
+
 }
