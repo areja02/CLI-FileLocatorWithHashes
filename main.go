@@ -109,12 +109,13 @@ func main() {
 			hasher256 := sha256.New()
 			hasherMD5 := md5.New()
 
-			if _, err := io.Copy(hasher256, file); err != nil {
+			hashesWrites := io.MultiWriter(hasher256, hasherMD5)
+
+			if _, err := io.Copy(hashesWrites, file); err != nil {
+				file.Close()
+				continue
 			}
 			hash256STR = hasher256.Sum(nil)
-
-			if _, err := io.Copy(hasherMD5, file); err != nil {
-			}
 			hashMD5STR = hasherMD5.Sum(nil)
 			fmt.Printf("File Path: %s\n   SHA256 HASH: %x\n   MD5 Hash: %x\n", file.Name(), hash256STR, hashMD5STR)
 			file.Close()
